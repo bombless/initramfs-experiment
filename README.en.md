@@ -50,6 +50,34 @@ Build and boot the Rust EFI launcher:
 ./scripts/run-qemu-uefi.sh
 ```
 
+## Install to Local `/boot`
+
+If you want to install the Rust EFI launcher into the local EFI System Partition and register it with `efibootmgr`, run:
+
+```sh
+./scripts/install-efi-boot-entry.sh
+```
+
+This script will:
+
+- Build the `initramfs` and Rust EFI launcher if needed.
+- Copy the EFI launcher to `/boot/EFI/alpine-limine/rust-efi-launcher.efi`.
+- Copy `vmlinuz-virt` and `alpine-initramfs.img` into `/boot/`.
+- Use `efibootmgr` to create a UEFI boot entry named `Alpine Limine Rust EFI`.
+
+Example with explicit options:
+
+```sh
+./scripts/install-efi-boot-entry.sh --boot-dir /boot --label "Alpine Limine Rust EFI"
+```
+
+Requirements:
+
+- The current system must be booted in UEFI mode.
+- `/boot` must already be mounted as the EFI System Partition.
+- `efibootmgr` must be installed on the host.
+
+
 ## OVMF Variable Store
 
 UEFI boot uses a separate script to initialize the writable OVMF variable store:

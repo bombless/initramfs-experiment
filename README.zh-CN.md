@@ -50,6 +50,34 @@ cd /home/openclaw/alpine-limine
 ./scripts/run-qemu-uefi.sh
 ```
 
+## 安装到本机 `/boot`
+
+如果你想把 Rust EFI 启动器安装到本机的 EFI 系统分区，并用 `efibootmgr` 增加启动项，可以运行：
+
+```sh
+./scripts/install-efi-boot-entry.sh
+```
+
+这个脚本会做几件事：
+
+- 如有需要，先构建 `initramfs` 和 Rust EFI 启动器。
+- 把 EFI 启动器复制到 `/boot/EFI/alpine-limine/rust-efi-launcher.efi`。
+- 把 `vmlinuz-virt` 和 `alpine-initramfs.img` 复制到 `/boot/`。
+- 调用 `efibootmgr` 添加一个名为 `Alpine Limine Rust EFI` 的 UEFI 启动项。
+
+可选参数：
+
+```sh
+./scripts/install-efi-boot-entry.sh --boot-dir /boot --label "Alpine Limine Rust EFI"
+```
+
+要求：
+
+- 当前系统必须以 UEFI 模式启动。
+- `/boot` 必须已经挂载到 EFI System Partition。
+- 主机上需要安装 `efibootmgr`。
+
+
 ## OVMF 变量盘
 
 UEFI 启动会使用独立脚本初始化变量盘：

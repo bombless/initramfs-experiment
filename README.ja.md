@@ -50,6 +50,34 @@ Rust EFI ランチャーをビルドして起動します。
 ./scripts/run-qemu-uefi.sh
 ```
 
+## ローカル `/boot` へのインストール
+
+Rust EFI ランチャーをローカルの EFI System Partition に配置し、`efibootmgr` で起動項目を追加したい場合は、次を実行します。
+
+```sh
+./scripts/install-efi-boot-entry.sh
+```
+
+このスクリプトは次を行います。
+
+- 必要に応じて `initramfs` と Rust EFI ランチャーをビルドします。
+- EFI ランチャーを `/boot/EFI/alpine-limine/rust-efi-launcher.efi` にコピーします。
+- `vmlinuz-virt` と `alpine-initramfs.img` を `/boot/` にコピーします。
+- `efibootmgr` を使って `Alpine Limine Rust EFI` という名前の UEFI 起動項目を追加します。
+
+明示的なオプション指定の例:
+
+```sh
+./scripts/install-efi-boot-entry.sh --boot-dir /boot --label "Alpine Limine Rust EFI"
+```
+
+要件:
+
+- 現在のシステムが UEFI モードで起動していること。
+- `/boot` が EFI System Partition としてすでにマウントされていること。
+- ホストに `efibootmgr` がインストールされていること。
+
+
 ## OVMF 変数ストア
 
 UEFI 起動では、書き込み可能な OVMF 変数ストアを別スクリプトで初期化します。
