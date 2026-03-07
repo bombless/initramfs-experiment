@@ -1,0 +1,25 @@
+# Build caches and downloaded toolchains
+/pkgs/
+/toolroot/
+/alpine/
+/minirootfs/
+/initramfs-root/
+/iso-root/
+/esp/
+/rust-efi-launcher/target/
+
+# Generated boot artifacts
+/alpine-initramfs.img
+/limine-alpine.iso
+/limine-bios.img
+/limine-part1.img
+/limine-bios-root/
+/OVMF_VARS.4m.fd
+
+# Generic noise
+*.log
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
