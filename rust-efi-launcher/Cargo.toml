@@ -1,0 +1,12 @@
+[package]
+name = "rust-efi-launcher"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+uefi = { version = "0.36.1", features = ["panic_handler"] }
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
