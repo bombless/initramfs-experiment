@@ -166,14 +166,11 @@ partnum="$PART_OVERRIDE"
 disk="$DISK_OVERRIDE"
 
 if [[ -z "$partnum" ]]; then
-    partnum=$(lsblk -no PARTNUM "$boot_part" | tr -d '[:space:]')
+    partnum=$(resolve_partition_number "$boot_part" || true)
 fi
 
 if [[ -z "$disk" ]]; then
-    pkname=$(lsblk -no PKNAME "$boot_part" | tr -d '[:space:]')
-    if [[ -n "$pkname" ]]; then
-        disk="/dev/$pkname"
-    fi
+    disk=$(resolve_parent_disk "$boot_part" || true)
 fi
 
 if [[ (-z "$disk" || -z "$partnum") && $AUTO_YES -ne 1 ]]; then

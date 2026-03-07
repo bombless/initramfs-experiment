@@ -66,6 +66,61 @@ resolve_mount_block_device() {
     return 1
 }
 
+resolve_partition_number() {
+    local device="$1"
+    local value=
+    local sysfs_partition="/sys/class/block/${device##*/}/partition"
+
+    value=$(lsblk -dn -o PARTN "$device" 2>/dev/null | tr -d '[:space:]' || true)
+    if [[ -n "$value" ]]; then
+        printf '%s
+' "$value"
+        return 0
+    fi
+
+    value=$(lsblk -dn -o PARTNUM "$device" 2>/dev/null | tr -d '[:space:]' || true)
+    if [[ -n "$value" ]]; then
+        printf '%s
+' "$value"
+        return 0
+    fi
+
+    if [[ -r "$sysfs_partition" ]]; then
+        value=$(tr -d '[:space:]' < "$sysfs_partition")
+        if [[ -n "$value" ]]; then
+            printf '%s
+' "$value"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+resolve_parent_disk() {
+    local device="$1"
+    local pkname=
+    local sysfs_disk_uevent="/sys/class/block/${device##*/}/../uevent"
+
+    pkname=$(lsblk -dn -o PKNAME "$device" 2>/dev/null | tr -d '[:space:]' || true)
+    if [[ -n "$pkname" ]]; then
+        printf '/dev/%s
+' "$pkname"
+        return 0
+    fi
+
+    if [[ -r "$sysfs_disk_uevent" ]]; then
+        pkname=$(sed -n 's/^DEVNAME=//p' "$sysfs_disk_uevent" | head -n1 | tr -d '[:space:]')
+        if [[ -n "$pkname" ]]; then
+            printf '/dev/%s
+' "$pkname"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 require_tool() {
     command -v "$1" >/dev/null 2>&1 || {
         echo "missing required host tool: $1" >&2
