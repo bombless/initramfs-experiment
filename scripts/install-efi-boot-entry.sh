@@ -114,9 +114,11 @@ if ! mountpoint -q "$BOOT_DIR"; then
     exit 1
 fi
 
-boot_part=$(realpath "$(findmnt -no SOURCE -T "$BOOT_DIR")")
-if [[ ! -b "$boot_part" ]]; then
-    echo "could not resolve a block device for $BOOT_DIR: $boot_part" >&2
+boot_part=$(resolve_mount_block_device "$BOOT_DIR" || true)
+if [[ -z "$boot_part" || ! -b "$boot_part" ]]; then
+    echo "could not resolve a block device for $BOOT_DIR" >&2
+    echo "findmnt returned:" >&2
+    findmnt -T "$BOOT_DIR" -o TARGET,SOURCE,FSTYPE,OPTIONS >&2 || true
     exit 1
 fi
 

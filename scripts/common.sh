@@ -46,6 +46,26 @@ export_qemu_env() {
     export LD_LIBRARY_PATH="$TOOLROOT/usr/lib:${LD_LIBRARY_PATH:-}"
 }
 
+resolve_mount_block_device() {
+    local mountpoint="$1"
+    local source
+    local resolved
+
+    while IFS= read -r source; do
+        [[ -n "$source" ]] || continue
+        [[ "$source" == /dev/* ]] || continue
+
+        resolved=$(realpath "$source")
+        if [[ -b "$resolved" ]]; then
+            printf '%s
+' "$resolved"
+            return 0
+        fi
+    done < <(findmnt -rn -o SOURCE -T "$mountpoint")
+
+    return 1
+}
+
 require_tool() {
     command -v "$1" >/dev/null 2>&1 || {
         echo "missing required host tool: $1" >&2
