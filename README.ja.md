@@ -58,14 +58,22 @@ Rust EFI ランチャーをローカルの EFI System Partition に配置し、`
 ./scripts/install-efi-boot-entry.sh
 ```
 
+既定では、このスクリプトはインストールのみを行い、自動ではビルドしません。
+不足している生成物がある場合は、そのままエラーにし、先にビルドするか `--build` を明示するよう案内します。
+
 このスクリプトは次を行います。
 
-- 必要に応じて `initramfs` と Rust EFI ランチャーをビルドします。
 - EFI ランチャーを `/boot/EFI/alpine-limine/rust-efi-launcher.efi` にコピーします。
 - `vmlinuz-virt` と `alpine-initramfs.img` を `/boot/` にコピーします。
 - `efibootmgr` を使って `Alpine Limine Rust EFI` という名前の UEFI 起動項目を追加します。
 
-明示的なオプション指定の例:
+インストール前に不足している生成物を自動でビルドしたい場合は、明示的に `--build` を付けてください。
+
+```sh
+./scripts/install-efi-boot-entry.sh --build
+```
+
+その他のオプション指定例:
 
 ```sh
 ./scripts/install-efi-boot-entry.sh --boot-dir /boot --label "Alpine Limine Rust EFI"

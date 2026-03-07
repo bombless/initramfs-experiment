@@ -58,14 +58,22 @@ cd /home/openclaw/alpine-limine
 ./scripts/install-efi-boot-entry.sh
 ```
 
+默认情况下，这个脚本只做安装，不会自动触发构建。
+如果缺少产物，它会直接报错并提示你先构建，或者显式加上 `--build`。
+
 这个脚本会做几件事：
 
-- 如有需要，先构建 `initramfs` 和 Rust EFI 启动器。
 - 把 EFI 启动器复制到 `/boot/EFI/alpine-limine/rust-efi-launcher.efi`。
 - 把 `vmlinuz-virt` 和 `alpine-initramfs.img` 复制到 `/boot/`。
 - 调用 `efibootmgr` 添加一个名为 `Alpine Limine Rust EFI` 的 UEFI 启动项。
 
-可选参数：
+如果你希望它在安装前自动构建缺失产物，可以显式加上 `--build`：
+
+```sh
+./scripts/install-efi-boot-entry.sh --build
+```
+
+其他可选参数：
 
 ```sh
 ./scripts/install-efi-boot-entry.sh --boot-dir /boot --label "Alpine Limine Rust EFI"

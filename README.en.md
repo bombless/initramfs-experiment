@@ -58,14 +58,22 @@ If you want to install the Rust EFI launcher into the local EFI System Partition
 ./scripts/install-efi-boot-entry.sh
 ```
 
+By default, this script only installs files and registers the boot entry.
+It does not trigger builds automatically. If artifacts are missing, it fails and tells you to build them first, or to pass `--build` explicitly.
+
 This script will:
 
-- Build the `initramfs` and Rust EFI launcher if needed.
 - Copy the EFI launcher to `/boot/EFI/alpine-limine/rust-efi-launcher.efi`.
 - Copy `vmlinuz-virt` and `alpine-initramfs.img` into `/boot/`.
 - Use `efibootmgr` to create a UEFI boot entry named `Alpine Limine Rust EFI`.
 
-Example with explicit options:
+If you want it to build missing artifacts before installation, pass `--build` explicitly:
+
+```sh
+./scripts/install-efi-boot-entry.sh --build
+```
+
+Example with other explicit options:
 
 ```sh
 ./scripts/install-efi-boot-entry.sh --boot-dir /boot --label "Alpine Limine Rust EFI"

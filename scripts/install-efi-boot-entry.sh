@@ -6,7 +6,7 @@ BOOT_DIR=/boot
 ENTRY_LABEL="Alpine Limine Rust EFI"
 ENTRY_DIR="EFI/alpine-limine"
 EFI_FILENAME="rust-efi-launcher.efi"
-SKIP_BUILD=0
+DO_BUILD=0
 
 usage() {
     cat <<USAGE
@@ -17,7 +17,7 @@ Options:
   --label <label>     UEFI boot entry label. Default: Alpine Limine Rust EFI
   --entry-dir <dir>   EFI subdirectory inside the ESP. Default: EFI/alpine-limine
   --efi-name <name>   EFI filename to install. Default: rust-efi-launcher.efi
-  --skip-build        Skip building the launcher/initramfs before installation
+  --build             Build missing launcher/initramfs before installation
   -h, --help          Show this help message
 USAGE
 }
@@ -40,8 +40,8 @@ while [[ $# -gt 0 ]]; do
             EFI_FILENAME="$2"
             shift 2
             ;;
-        --skip-build)
-            SKIP_BUILD=1
+        --build)
+            DO_BUILD=1
             shift
             ;;
         -h|--help)
@@ -70,17 +70,38 @@ ensure_artifacts() {
     [[ -f "$LAUNCHER" ]] || "$ROOT_DIR/scripts/build-rust-efi.sh"
 }
 
-if [[ $SKIP_BUILD -eq 0 ]]; then
+check_artifacts() {
+    local missing=0
+    for file in "$INITRAMFS" "$KERNEL" "$LAUNCHER"; do
+        if [[ ! -f "$file" ]]; then
+            echo "missing required artifact: $file" >&2
+            missing=1
+        fi
+    done
+
+    if [[ $missing -ne 0 ]]; then
+        echo "run with --build to generate missing artifacts first" >&2
+        exit 1
+    fi
+}
+
+if [[ $DO_BUILD -eq 1 ]]; then
     ensure_artifacts
+else
+    check_artifacts
 fi
 
 if [[ $EUID -ne 0 ]]; then
+    extra_args=()
+    if [[ $DO_BUILD -eq 1 ]]; then
+        extra_args+=(--build)
+    fi
     exec sudo --preserve-env=PROXY_URL,ALL_PROXY_URL "$0" \
         --boot-dir "$BOOT_DIR" \
         --label "$ENTRY_LABEL" \
         --entry-dir "$ENTRY_DIR" \
         --efi-name "$EFI_FILENAME" \
-        --skip-build
+        "${extra_args[@]}"
 fi
 
 if [[ ! -d /sys/firmware/efi/efivars ]]; then
