@@ -12,6 +12,6 @@ use_proxy
 rustup target add x86_64-unknown-uefi
 
 cd "$ROOT_DIR/rust-efi-launcher"
-cargo build --release --target x86_64-unknown-uefi
+cargo build --release
 
 echo "built: $ROOT_DIR/rust-efi-launcher/target/x86_64-unknown-uefi/release/rust-efi-launcher.efi"
