@@ -73,6 +73,12 @@ If you want it to build missing artifacts before installation, pass `--build` ex
 ./scripts/install-efi-boot-entry.sh --build
 ```
 
+If automatic detection of the `efibootmgr` disk or partition number fails, you can also override them manually:
+
+```sh
+./scripts/install-efi-boot-entry.sh --disk /dev/nvme0n1 --part 5
+```
+
 Example with other explicit options:
 
 ```sh

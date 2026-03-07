@@ -7,6 +7,9 @@ ENTRY_LABEL="Alpine Limine Rust EFI"
 ENTRY_DIR="EFI/alpine-limine"
 EFI_FILENAME="rust-efi-launcher.efi"
 DO_BUILD=0
+AUTO_YES=0
+DISK_OVERRIDE=
+PART_OVERRIDE=
 
 usage() {
     cat <<USAGE
@@ -17,7 +20,10 @@ Options:
   --label <label>     UEFI boot entry label. Default: Alpine Limine Rust EFI
   --entry-dir <dir>   EFI subdirectory inside the ESP. Default: EFI/alpine-limine
   --efi-name <name>   EFI filename to install. Default: rust-efi-launcher.efi
+  --disk <device>     Override parent disk for efibootmgr, e.g. /dev/nvme0n1
+  --part <number>     Override partition number for efibootmgr, e.g. 5
   --build             Build missing launcher/initramfs before installation
+  --yes               Skip interactive confirmation
   -h, --help          Show this help message
 USAGE
 }
@@ -40,8 +46,20 @@ while [[ $# -gt 0 ]]; do
             EFI_FILENAME="$2"
             shift 2
             ;;
+        --disk)
+            DISK_OVERRIDE="$2"
+            shift 2
+            ;;
+        --part)
+            PART_OVERRIDE="$2"
+            shift 2
+            ;;
         --build)
             DO_BUILD=1
+            shift
+            ;;
+        --yes)
+            AUTO_YES=1
             shift
             ;;
         -h|--help)
@@ -85,6 +103,19 @@ check_artifacts() {
     fi
 }
 
+prompt_value() {
+    local prompt="$1"
+    local default_value="$2"
+    local reply
+    if [[ -n "$default_value" ]]; then
+        read -r -p "$prompt [$default_value]: " reply
+        printf '%s\n' "${reply:-$default_value}"
+    else
+        read -r -p "$prompt: " reply
+        printf '%s\n' "$reply"
+    fi
+}
+
 if [[ $DO_BUILD -eq 1 ]]; then
     ensure_artifacts
 else
@@ -93,9 +124,10 @@ fi
 
 if [[ $EUID -ne 0 ]]; then
     extra_args=()
-    if [[ $DO_BUILD -eq 1 ]]; then
-        extra_args+=(--build)
-    fi
+    [[ $DO_BUILD -eq 1 ]] && extra_args+=(--build)
+    [[ $AUTO_YES -eq 1 ]] && extra_args+=(--yes)
+    [[ -n "$DISK_OVERRIDE" ]] && extra_args+=(--disk "$DISK_OVERRIDE")
+    [[ -n "$PART_OVERRIDE" ]] && extra_args+=(--part "$PART_OVERRIDE")
     exec sudo --preserve-env=PROXY_URL,ALL_PROXY_URL "$0" \
         --boot-dir "$BOOT_DIR" \
         --label "$ENTRY_LABEL" \
@@ -115,24 +147,78 @@ if ! mountpoint -q "$BOOT_DIR"; then
 fi
 
 boot_part=$(resolve_mount_block_device "$BOOT_DIR" || true)
+if [[ -z "$boot_part" && $AUTO_YES -ne 1 ]]; then
+    echo "automatic ESP partition detection failed for $BOOT_DIR" >&2
+    echo "findmnt returned:" >&2
+    findmnt -T "$BOOT_DIR" -o TARGET,SOURCE,FSTYPE,OPTIONS >&2 || true
+    boot_part=$(prompt_value 'Enter the ESP partition device (e.g. /dev/nvme0n1p5)' '')
+fi
+
 if [[ -z "$boot_part" || ! -b "$boot_part" ]]; then
     echo "could not resolve a block device for $BOOT_DIR" >&2
     echo "findmnt returned:" >&2
     findmnt -T "$BOOT_DIR" -o TARGET,SOURCE,FSTYPE,OPTIONS >&2 || true
+    echo "You can rerun with --disk /dev/... --part N" >&2
     exit 1
 fi
 
-partnum=$(lsblk -no PARTNUM "$boot_part" | tr -d '[:space:]')
-pkname=$(lsblk -no PKNAME "$boot_part" | tr -d '[:space:]')
+partnum="$PART_OVERRIDE"
+disk="$DISK_OVERRIDE"
 
-if [[ -z "$partnum" || -z "$pkname" ]]; then
+if [[ -z "$partnum" ]]; then
+    partnum=$(lsblk -no PARTNUM "$boot_part" | tr -d '[:space:]')
+fi
+
+if [[ -z "$disk" ]]; then
+    pkname=$(lsblk -no PKNAME "$boot_part" | tr -d '[:space:]')
+    if [[ -n "$pkname" ]]; then
+        disk="/dev/$pkname"
+    fi
+fi
+
+if [[ (-z "$disk" || -z "$partnum") && $AUTO_YES -ne 1 ]]; then
+    echo "automatic efibootmgr disk/partition detection is incomplete" >&2
+    echo "resolved ESP partition: $boot_part" >&2
+    [[ -z "$disk" ]] && disk=$(prompt_value 'Enter parent disk for efibootmgr (e.g. /dev/nvme0n1)' "$disk")
+    [[ -z "$partnum" ]] && partnum=$(prompt_value 'Enter partition number for efibootmgr (e.g. 5)' "$partnum")
+fi
+
+if [[ -z "$disk" || -z "$partnum" ]]; then
     echo "failed to determine disk/partition for $boot_part" >&2
+    echo "You can rerun with --disk /dev/... --part N" >&2
     exit 1
 fi
 
-disk="/dev/$pkname"
 loader_path="\\${ENTRY_DIR//\//\\}\\$EFI_FILENAME"
 install_dir="$BOOT_DIR/$ENTRY_DIR"
+
+printf '%s\n' 'Installation plan:'
+printf '  boot mountpoint:     %s\n' "$BOOT_DIR"
+printf '  ESP partition:       %s\n' "$boot_part"
+printf '  disk:                %s\n' "$disk"
+printf '  partition number:    %s\n' "$partnum"
+printf '  EFI directory:       %s\n' "$install_dir"
+printf '  EFI launcher target: %s\n' "$install_dir/$EFI_FILENAME"
+printf '  kernel target:       %s\n' "$BOOT_DIR/vmlinuz-virt"
+printf '  initramfs target:    %s\n' "$BOOT_DIR/alpine-initramfs.img"
+printf '  UEFI label:          %s\n' "$ENTRY_LABEL"
+printf '  UEFI loader path:    %s\n' "$loader_path"
+
+if [[ $AUTO_YES -ne 1 ]]; then
+    if [[ ! -t 0 ]]; then
+        echo 'refusing to continue without confirmation on a non-interactive terminal; rerun with --yes' >&2
+        exit 1
+    fi
+    read -r -p 'Proceed with copy and efibootmgr entry creation? [y/N] ' reply
+    case "$reply" in
+        y|Y|yes|YES)
+            ;;
+        *)
+            echo 'aborted by user'
+            exit 1
+            ;;
+    esac
+fi
 
 mkdir -p "$install_dir"
 install -m 0644 "$KERNEL" "$BOOT_DIR/vmlinuz-virt"
@@ -143,11 +229,6 @@ sync
 echo "installed launcher: $install_dir/$EFI_FILENAME"
 echo "installed kernel:   $BOOT_DIR/vmlinuz-virt"
 echo "installed initramfs:$BOOT_DIR/alpine-initramfs.img"
-
-echo "detected ESP partition: $boot_part"
-echo "detected disk:          $disk"
-echo "detected partnum:       $partnum"
-echo "UEFI loader path:       $loader_path"
 
 if efibootmgr -v | grep -F "$ENTRY_LABEL" | grep -F "$loader_path" >/dev/null 2>&1; then
     echo "matching efibootmgr entry already exists; skipping creation"

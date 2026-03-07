@@ -73,6 +73,12 @@ cd /home/openclaw/alpine-limine
 ./scripts/install-efi-boot-entry.sh --build
 ```
 
+如果自动探测 `efibootmgr` 需要的磁盘或分区号失败，也可以手动指定：
+
+```sh
+./scripts/install-efi-boot-entry.sh --disk /dev/nvme0n1 --part 5
+```
+
 其他可选参数：
 
 ```sh

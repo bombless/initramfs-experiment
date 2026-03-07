@@ -73,6 +73,12 @@ Rust EFI ランチャーをローカルの EFI System Partition に配置し、`
 ./scripts/install-efi-boot-entry.sh --build
 ```
 
+`efibootmgr` に必要なディスクやパーティション番号の自動検出に失敗した場合は、手動指定もできます。
+
+```sh
+./scripts/install-efi-boot-entry.sh --disk /dev/nvme0n1 --part 5
+```
+
 その他のオプション指定例:
 
 ```sh
