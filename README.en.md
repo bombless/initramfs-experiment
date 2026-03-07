@@ -78,6 +78,23 @@ Requirements:
 - `efibootmgr` must be installed on the host.
 
 
+## Remove the UEFI Boot Entry
+
+If you want to remove the boot entry previously created with `efibootmgr`, run:
+
+```sh
+./scripts/remove-efi-boot-entry.sh
+```
+
+If you also want to remove the files that were copied into `/boot`, run:
+
+```sh
+./scripts/remove-efi-boot-entry.sh --delete-files
+```
+
+This script matches entries by boot label and EFI loader path, then removes them with `efibootmgr --delete-bootnum`.
+
+
 ## OVMF Variable Store
 
 UEFI boot uses a separate script to initialize the writable OVMF variable store:

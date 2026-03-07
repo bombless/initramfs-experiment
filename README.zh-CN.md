@@ -78,6 +78,23 @@ cd /home/openclaw/alpine-limine
 - 主机上需要安装 `efibootmgr`。
 
 
+## 删除 UEFI 启动项
+
+如果你想把之前加入的 `efibootmgr` 启动项删掉，可以运行：
+
+```sh
+./scripts/remove-efi-boot-entry.sh
+```
+
+如果还想连同复制到 `/boot` 的文件一起删除，可以运行：
+
+```sh
+./scripts/remove-efi-boot-entry.sh --delete-files
+```
+
+这个脚本会按启动项标签和 EFI loader 路径匹配，然后调用 `efibootmgr --delete-bootnum` 删除对应条目。
+
+
 ## OVMF 变量盘
 
 UEFI 启动会使用独立脚本初始化变量盘：

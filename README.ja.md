@@ -78,6 +78,23 @@ Rust EFI ランチャーをローカルの EFI System Partition に配置し、`
 - ホストに `efibootmgr` がインストールされていること。
 
 
+## UEFI 起動項目の削除
+
+以前 `efibootmgr` で追加した起動項目を削除したい場合は、次を実行します。
+
+```sh
+./scripts/remove-efi-boot-entry.sh
+```
+
+`/boot` にコピーしたファイルもあわせて削除したい場合は、次を実行します。
+
+```sh
+./scripts/remove-efi-boot-entry.sh --delete-files
+```
+
+このスクリプトは、起動項目ラベルと EFI ローダーパスで一致する項目を探し、`efibootmgr --delete-bootnum` で削除します。
+
+
 ## OVMF 変数ストア
 
 UEFI 起動では、書き込み可能な OVMF 変数ストアを別スクリプトで初期化します。
