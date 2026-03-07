@@ -9,16 +9,22 @@ MINIROOTFS_DIR="$ROOT_DIR/minirootfs"
 ISO_ROOT="$ROOT_DIR/iso-root"
 ESP_DIR="$ROOT_DIR/esp"
 
-DEFAULT_PROXY_URL="http://127.0.0.1:10808"
-DEFAULT_ALL_PROXY_URL="socks5://127.0.0.1:10808"
-
 use_proxy() {
-    export http_proxy="${PROXY_URL:-$DEFAULT_PROXY_URL}"
-    export https_proxy="${PROXY_URL:-$DEFAULT_PROXY_URL}"
-    export HTTP_PROXY="$http_proxy"
-    export HTTPS_PROXY="$https_proxy"
-    export all_proxy="${ALL_PROXY_URL:-$DEFAULT_ALL_PROXY_URL}"
-    export ALL_PROXY="$all_proxy"
+    if [[ -n "${PROXY_URL:-}" ]]; then
+        export http_proxy="$PROXY_URL"
+        export https_proxy="$PROXY_URL"
+        export HTTP_PROXY="$http_proxy"
+        export HTTPS_PROXY="$https_proxy"
+    else
+        unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+    fi
+
+    if [[ -n "${ALL_PROXY_URL:-}" ]]; then
+        export all_proxy="$ALL_PROXY_URL"
+        export ALL_PROXY="$all_proxy"
+    else
+        unset all_proxy ALL_PROXY
+    fi
 }
 
 fetch_and_extract_pkg() {

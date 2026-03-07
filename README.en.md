@@ -63,11 +63,11 @@ That file is runtime state and is not tracked by Git.
 
 ## Proxy
 
-If the network is unstable, set these variables before running the scripts:
+If the network is unstable, you can set these variables before running the scripts:
 
 ```sh
 export PROXY_URL=http://127.0.0.1:10808
 export ALL_PROXY_URL=socks5://127.0.0.1:10808
 ```
 
-If you do not set them explicitly, the scripts will still try `127.0.0.1:10808` by default.
+If you do not set them, the scripts will use a direct connection and will not enable any proxy by default.
