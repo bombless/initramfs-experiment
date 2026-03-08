@@ -17,10 +17,15 @@ use uefi::{
 // Prefer vmlinuz-lts (physical hardware), fallback to vmlinuz-virt (VMs).
 const KERNEL_PATH_LTS: &CStr16 = cstr16!("\\vmlinuz-lts");
 const KERNEL_PATH_VIRT: &CStr16 = cstr16!("\\vmlinuz-virt");
+const KERNEL_PATH_ARCH: &CStr16 = cstr16!("\\vmlinuz-linux");
 const KERNEL_NAME_LTS: &str = "vmlinuz-lts";
 const KERNEL_NAME_VIRT: &str = "vmlinuz-virt";
-const KERNEL_CMDLINE: &CStr16 =
+const KERNEL_NAME_ARCH: &str = "vmlinuz-linux";
+const ALPINE_KERNEL_CMDLINE: &CStr16 =
     cstr16!("console=ttyS0,115200 rdinit=/init loglevel=7 initrd=\\alpine-initramfs.img");
+const ARCH_KERNEL_CMDLINE: &CStr16 = cstr16!(
+    "quiet loglevel=3 splash rd.luks.name=47575aab-f003-4a13-a1cf-e6b9d2cd7621=root root=/dev/mapper/root rw initrd=\\intel-ucode.img initrd=\\initramfs-linux.img"
+);
 
 #[derive(Copy, Clone)]
 struct KernelCandidate {
@@ -39,9 +44,15 @@ const KERNEL_CANDIDATES: [KernelCandidate; 2] = [
     },
 ];
 
+const ARCH_KERNEL_CANDIDATES: [KernelCandidate; 1] = [KernelCandidate {
+    name: KERNEL_NAME_ARCH,
+    path: KERNEL_PATH_ARCH,
+}];
+
 #[derive(Copy, Clone)]
 enum MenuAction {
-    BootKernel,
+    BootAlpineKernel,
+    BootArchLinux,
     Shutdown,
     Reboot,
 }
@@ -57,38 +68,56 @@ fn main() -> Status {
 }
 
 fn run() -> core::result::Result<(), Status> {
-    let mut kernel_hint = probe_available_kernel_name()?;
+    let mut alpine_kernel_hint = probe_available_kernel_name(&KERNEL_CANDIDATES)?;
+    let mut arch_kernel_hint = probe_available_kernel_name(&ARCH_KERNEL_CANDIDATES)?;
 
     loop {
-        print_menu(kernel_hint);
+        print_menu(alpine_kernel_hint, arch_kernel_hint);
 
         match read_menu_action()? {
-            MenuAction::BootKernel => match boot_first_available_kernel() {
-                Ok(kernel_name) => {
-                    println!("Kernel image returned to launcher: {}", kernel_name);
+            MenuAction::BootAlpineKernel => {
+                match boot_first_available_kernel(&KERNEL_CANDIDATES, ALPINE_KERNEL_CMDLINE) {
+                    Ok(kernel_name) => {
+                        println!("Kernel image returned to launcher: {}", kernel_name);
+                    }
+                    Err(status) => {
+                        println!("Boot failed: {:?}", status);
+                    }
                 }
-                Err(status) => {
-                    println!("Boot failed: {:?}", status);
+            }
+            MenuAction::BootArchLinux => {
+                match boot_first_available_kernel(&ARCH_KERNEL_CANDIDATES, ARCH_KERNEL_CMDLINE) {
+                    Ok(kernel_name) => {
+                        println!("Kernel image returned to launcher: {}", kernel_name);
+                    }
+                    Err(status) => {
+                        println!("Boot failed: {:?}", status);
+                    }
                 }
-            },
+            }
             MenuAction::Shutdown => runtime::reset(ResetType::SHUTDOWN, Status::SUCCESS, None),
             MenuAction::Reboot => runtime::reset(ResetType::COLD, Status::SUCCESS, None),
         }
 
-        kernel_hint = probe_available_kernel_name()?;
+        alpine_kernel_hint = probe_available_kernel_name(&KERNEL_CANDIDATES)?;
+        arch_kernel_hint = probe_available_kernel_name(&ARCH_KERNEL_CANDIDATES)?;
     }
 }
 
-fn print_menu(kernel_hint: Option<&'static str>) {
+fn print_menu(alpine_kernel_hint: Option<&'static str>, arch_kernel_hint: Option<&'static str>) {
     println!();
     println!("=== Rust EFI Launcher ===");
-    match kernel_hint {
-        Some(name) => println!("1) Boot Linux kernel ({})", name),
-        None => println!("1) Boot Linux kernel (no kernel file found)"),
+    match alpine_kernel_hint {
+        Some(name) => println!("1) Boot Alpine kernel ({})", name),
+        None => println!("1) Boot Alpine kernel (no kernel file found)"),
     }
-    println!("2) Shutdown");
-    println!("3) Reboot");
-    println!("Press 1/2/3.");
+    match arch_kernel_hint {
+        Some(name) => println!("2) Boot Arch Linux ({})", name),
+        None => println!("2) Boot Arch Linux (no kernel file found)"),
+    }
+    println!("3) Shutdown");
+    println!("4) Reboot");
+    println!("Press 1/2/3/4.");
 }
 
 fn read_menu_action() -> core::result::Result<MenuAction, Status> {
@@ -100,17 +129,20 @@ fn read_menu_action() -> core::result::Result<MenuAction, Status> {
                 boot::wait_for_event(&mut events).map_err(|err| err.status())?;
 
                 match stdin.read_key().map_err(|err| err.status())? {
-                    Some(Key::Printable(ch)) if ch == '1' || ch == 'b' || ch == 'B' => {
-                        return Ok(MenuAction::BootKernel);
+                    Some(Key::Printable(ch)) if ch == '1' || ch == 'a' || ch == 'A' => {
+                        return Ok(MenuAction::BootAlpineKernel);
                     }
-                    Some(Key::Printable(ch)) if ch == '2' || ch == 's' || ch == 'S' => {
+                    Some(Key::Printable(ch)) if ch == '2' || ch == 'l' || ch == 'L' => {
+                        return Ok(MenuAction::BootArchLinux);
+                    }
+                    Some(Key::Printable(ch)) if ch == '3' || ch == 's' || ch == 'S' => {
                         return Ok(MenuAction::Shutdown);
                     }
-                    Some(Key::Printable(ch)) if ch == '3' || ch == 'r' || ch == 'R' => {
+                    Some(Key::Printable(ch)) if ch == '4' || ch == 'r' || ch == 'R' => {
                         return Ok(MenuAction::Reboot);
                     }
                     _ => {
-                        println!("Invalid input. Press 1, 2, or 3.");
+                        println!("Invalid input. Press 1, 2, 3, or 4.");
                     }
                 }
             }
@@ -118,9 +150,11 @@ fn read_menu_action() -> core::result::Result<MenuAction, Status> {
     )
 }
 
-fn probe_available_kernel_name() -> core::result::Result<Option<&'static str>, Status> {
+fn probe_available_kernel_name(
+    candidates: &[KernelCandidate],
+) -> core::result::Result<Option<&'static str>, Status> {
     with_boot_device_path(|parent, device_path| {
-        for candidate in &KERNEL_CANDIDATES {
+        for candidate in candidates {
             match load_kernel_image(parent, device_path, candidate.path) {
                 Ok(handle) => {
                     boot::unload_image(handle).map_err(|err| err.status())?;
@@ -134,16 +168,19 @@ fn probe_available_kernel_name() -> core::result::Result<Option<&'static str>, S
     })
 }
 
-fn boot_first_available_kernel() -> core::result::Result<&'static str, Status> {
+fn boot_first_available_kernel(
+    candidates: &[KernelCandidate],
+    cmdline: &CStr16,
+) -> core::result::Result<&'static str, Status> {
     with_boot_device_path(|parent, device_path| {
-        for candidate in &KERNEL_CANDIDATES {
+        for candidate in candidates {
             let kernel_handle = match load_kernel_image(parent, device_path, candidate.path) {
                 Ok(handle) => handle,
                 Err(_) => continue,
             };
 
             println!("Loaded kernel: {}", candidate.name);
-            set_kernel_cmdline(kernel_handle)?;
+            set_kernel_cmdline(kernel_handle, cmdline)?;
             println!("Rust EFI launcher: starting kernel...");
             boot::start_image(kernel_handle).map_err(|err| err.status())?;
             return Ok(candidate.name);
@@ -153,14 +190,13 @@ fn boot_first_available_kernel() -> core::result::Result<&'static str, Status> {
     })
 }
 
-fn set_kernel_cmdline(kernel_handle: Handle) -> core::result::Result<(), Status> {
+fn set_kernel_cmdline(kernel_handle: Handle, cmdline: &CStr16) -> core::result::Result<(), Status> {
     let mut kernel_image = boot::open_protocol_exclusive::<LoadedImage>(kernel_handle)
         .map_err(|err| err.status())?;
-    let load_options_len =
-        u32::try_from(KERNEL_CMDLINE.num_bytes()).map_err(|_| Status::BAD_BUFFER_SIZE)?;
+    let load_options_len = u32::try_from(cmdline.num_bytes()).map_err(|_| Status::BAD_BUFFER_SIZE)?;
 
     unsafe {
-        kernel_image.set_load_options(KERNEL_CMDLINE.as_ptr().cast(), load_options_len);
+        kernel_image.set_load_options(cmdline.as_ptr().cast(), load_options_len);
     }
 
     Ok(())
